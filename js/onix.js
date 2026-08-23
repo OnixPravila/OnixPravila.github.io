@@ -52,34 +52,51 @@
         if (cfg.name) document.title = document.title.replace(/^ONIX(?: ROLEPLAY)?(?= —|$)/, cfg.name);
     }
 
+    function paypalSafe(text, max) {
+        const map = {
+            č: 'c', ć: 'c', š: 's', ž: 'z', đ: 'dj',
+            Č: 'C', Ć: 'C', Š: 'S', Ž: 'Z', Đ: 'Dj',
+            ä: 'a', ö: 'o', ü: 'u', ß: 'ss'
+        };
+        return String(text || '')
+            .replace(/[čćšžđČĆŠŽĐäöüß]/g, (c) => map[c] || c)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^\x20-\x7E]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, max || 120);
+    }
+
     function paypalCheckout(product, character) {
         const email = 'seid98sutovic@gmail.com';
         const amount = Number(product.price) || 0;
         if (amount <= 0) return false;
-        const itemName = String((product.name || 'ONIX ROLEPLAY') + (character ? ' - ' + character : ''))
-            .replace(/[^\x20-\x7E]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 120);
+        const ic = paypalSafe(character, 80);
+        const itemName = paypalSafe(
+            (product.name || 'ONIX ROLEPLAY') + (ic ? ' - ' + ic : ''),
+            100
+        ) || 'ONIX ROLEPLAY';
         const fields = {
             cmd: '_xclick',
             business: email,
             item_name: itemName,
-            item_number: String(product.id || '').slice(0, 127),
+            item_number: paypalSafe(product.id || 'onix', 64),
             amount: amount.toFixed(2),
             currency_code: 'EUR',
             quantity: '1',
             no_shipping: '1',
-            no_note: '1',
-            charset: 'utf-8',
-            lc: 'US',
-            custom: String(character || '').slice(0, 200)
+            charset: 'utf-8'
         };
+        if (ic) fields.custom = ic;
+
+        // Isti tab = pouzdanije od popup-a (drugi browseri blokiraju _blank form).
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = 'https://www.paypal.com/cgi-bin/webscr';
-        form.target = '_blank';
+        form.target = '_self';
         form.acceptCharset = 'UTF-8';
+        form.style.display = 'none';
         Object.keys(fields).forEach((key) => {
             const input = document.createElement('input');
             input.type = 'hidden';
@@ -89,7 +106,6 @@
         });
         document.body.appendChild(form);
         form.submit();
-        form.remove();
         return true;
     }
 
@@ -378,7 +394,7 @@
             toast('PayPal nije spojen');
             return;
         }
-        toast('PayPal otvoren — zatim ticket na Discord');
+        toast('Otvaram PayPal…');
     }
 
     function renderReel() {
